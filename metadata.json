@@ -1,5 +1,5 @@
 {
-  "name": "Gemini Image Enhancer",
+  "name": "Magic Image Enhancer",
   "description": "An application to enhance the quality of multiple images, making them sharper and clearer using the Gemini API. Users can upload blurry images, process them, and download the high-definition results.",
   "requestFramePermissions": []
 }

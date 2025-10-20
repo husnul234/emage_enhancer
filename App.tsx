@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { ImageFile, ImageFileStatus } from './types';
 import { enhanceImage } from './services/geminiService';
 import { ImageCard } from './components/ImageCard';
@@ -6,14 +6,47 @@ import { UploadIcon, SparklesIcon, DownloadIcon } from './components/Icons';
 
 declare const JSZip: any;
 
-const fileToDataURL = (file: File): Promise<string> => {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result as string);
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
-};
+const resizeAndPadImage = (file: File, targetWidth: number, targetHeight: number): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        if (!e.target?.result) {
+          return reject(new Error('Failed to read file.'));
+        }
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          canvas.width = targetWidth;
+          canvas.height = targetHeight;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) {
+            return reject(new Error('Could not get canvas context'));
+          }
+  
+          // Use a dark gray background for padding, matching the app theme
+          ctx.fillStyle = '#1f2937'; // bg-gray-800
+          ctx.fillRect(0, 0, targetWidth, targetHeight);
+  
+          // Calculate the best fit
+          const scale = Math.min(targetWidth / img.width, targetHeight / img.height);
+          const newWidth = img.width * scale;
+          const newHeight = img.height * scale;
+  
+          // Center the image
+          const x = (targetWidth - newWidth) / 2;
+          const y = (targetHeight - newHeight) / 2;
+  
+          ctx.drawImage(img, x, y, newWidth, newHeight);
+  
+          resolve(canvas.toDataURL(file.type));
+        };
+        img.onerror = reject;
+        img.src = e.target.result as string;
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  };
 
 const fileToBase64 = (dataUrl: string): string => {
   return dataUrl.split(',')[1];
@@ -31,7 +64,7 @@ const App: React.FC = () => {
     const newImageFiles: ImageFile[] = [];
     for (const file of Array.from(files)) {
       if (file.type.startsWith('image/')) {
-        const dataUrl = await fileToDataURL(file);
+        const dataUrl = await resizeAndPadImage(file, 1080, 1350);
         newImageFiles.push({
           id: `${file.name}-${Date.now()}`,
           file,
@@ -138,7 +171,7 @@ const App: React.FC = () => {
           <div className="flex justify-center items-center gap-4 mb-2">
             <SparklesIcon className="w-12 h-12 text-cyan-400" />
             <h1 className="text-4xl sm:text-5xl font-extrabold bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 to-purple-500">
-              Gemini Image Enhancer
+              Magic Image Enhancer
             </h1>
           </div>
           <p className="text-lg text-gray-400">
@@ -159,6 +192,7 @@ const App: React.FC = () => {
                 <UploadIcon className="w-12 h-12 text-gray-400 mb-4" />
                 <p className="text-xl font-semibold text-gray-200">Drag & drop your images here</p>
                 <p className="text-gray-400">or click to browse</p>
+                <p className="text-sm text-gray-500 mt-2">Images will be automatically resized to 1080x1350.</p>
                 <input
                   id="file-upload"
                   type="file"
